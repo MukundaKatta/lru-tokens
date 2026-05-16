@@ -1,0 +1,15 @@
+[package]
+name = "lru-tokens"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+description = "LRU cache where eviction is weighted by token count, not entry count. Bound a prompt cache by tokens (or any other size unit) instead of N entries. Zero deps."
+authors = ["Mukunda Rao Katta <mukunda.vjcs6@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/MukundaKatta/lru-tokens"
+homepage = "https://github.com/MukundaKatta/lru-tokens"
+documentation = "https://docs.rs/lru-tokens"
+readme = "README.md"
+keywords = ["lru", "cache", "tokens", "llm", "weighted"]
+categories = ["caching", "data-structures"]
+exclude = [".github/*", "target/*"]
