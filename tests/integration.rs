@@ -54,8 +54,9 @@ fn peek_does_not_bump_recency() {
 fn oversize_entry_kept_alone() {
     let mut c: LruTokens<&str, ()> = LruTokens::new(100);
     c.put("a", (), 50);
-    c.put("huge", (), 5000); // larger than capacity
-    // Eviction loop won't drop the last entry, so we end with just "huge".
+    // `huge` is larger than capacity; the eviction loop won't drop the last
+    // entry, so we end with just "huge".
+    c.put("huge", (), 5000);
     assert_eq!(c.len(), 1);
     assert!(c.peek(&"huge").is_some());
     assert_eq!(c.weight(), 5000);
@@ -87,4 +88,19 @@ fn clear_resets() {
     c.clear();
     assert!(c.is_empty());
     assert_eq!(c.weight(), 0);
+}
+
+#[test]
+fn capacity_is_reported() {
+    let c: LruTokens<&str, ()> = LruTokens::new(4242);
+    assert_eq!(c.capacity(), 4242);
+}
+
+#[test]
+fn weight_saturates_instead_of_overflowing() {
+    // Cumulative weight must never panic or wrap when it would exceed u64::MAX.
+    let mut c: LruTokens<u64, ()> = LruTokens::new(u64::MAX);
+    c.put(1, (), u64::MAX);
+    c.put(2, (), 10); // u64::MAX + 10 would overflow without saturation
+    assert_eq!(c.weight(), u64::MAX);
 }

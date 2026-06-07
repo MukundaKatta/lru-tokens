@@ -87,12 +87,15 @@ where
     ///
     /// If `weight` itself exceeds `capacity`, the cache will end up
     /// holding just this one entry with `self.weight() == weight`.
+    ///
+    /// Cumulative weight saturates at `u64::MAX` rather than overflowing,
+    /// so inserting near-maximal weights can never panic or wrap.
     pub fn put(&mut self, key: K, value: V, weight: u64) {
         // Replace existing entry (free up its old weight first).
         if let Some(old) = self.map.remove(&key) {
             self.weight -= old.weight;
         }
-        self.tick += 1;
+        self.tick = self.tick.saturating_add(1);
         self.map.insert(
             key.clone(),
             Entry {
@@ -101,13 +104,13 @@ where
                 last_access: self.tick,
             },
         );
-        self.weight += weight;
+        self.weight = self.weight.saturating_add(weight);
         self.evict_until_fits();
     }
 
     /// Look up an entry; bumps recency on hit.
     pub fn get(&mut self, key: &K) -> Option<&V> {
-        self.tick += 1;
+        self.tick = self.tick.saturating_add(1);
         let tick = self.tick;
         let entry = self.map.get_mut(key)?;
         entry.last_access = tick;
