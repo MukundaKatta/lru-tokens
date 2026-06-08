@@ -104,3 +104,62 @@ fn weight_saturates_instead_of_overflowing() {
     c.put(2, (), 10); // u64::MAX + 10 would overflow without saturation
     assert_eq!(c.weight(), u64::MAX);
 }
+
+#[test]
+fn put_existing_key_bumps_recency() {
+    // Re-inserting an existing key must refresh its recency so it survives
+    // a later eviction that an older, untouched key does not.
+    let mut c: LruTokens<&str, i32> = LruTokens::new(100);
+    c.put("a", 1, 40);
+    c.put("b", 2, 40);
+    c.put("a", 11, 40); // update "a"; "b" is now the LRU
+    c.put("c", 3, 40); // 40 + 40 + 40 = 120 > 100; evict LRU ("b")
+    assert_eq!(
+        c.peek(&"a"),
+        Some(&11),
+        "updated 'a' should survive and hold new value"
+    );
+    assert!(c.peek(&"b").is_none(), "'b' should be evicted as the LRU");
+    assert!(c.peek(&"c").is_some(), "'c' should be present");
+}
+
+#[test]
+fn zero_capacity_keeps_only_newest() {
+    // With capacity 0 every entry is oversize; the eviction loop never drops
+    // the last remaining entry, so the cache holds exactly the most recent one.
+    let mut c: LruTokens<&str, ()> = LruTokens::new(0);
+    c.put("a", (), 5);
+    assert_eq!(c.len(), 1);
+    assert!(c.peek(&"a").is_some());
+
+    c.put("b", (), 5);
+    assert_eq!(c.len(), 1, "inserting 'b' should evict 'a'");
+    assert!(c.peek(&"a").is_none());
+    assert!(c.peek(&"b").is_some());
+}
+
+#[test]
+fn zero_weight_entries_never_evicted() {
+    // Weightless entries never push cumulative weight over a positive capacity,
+    // so none of them are evicted regardless of count.
+    let mut c: LruTokens<i32, ()> = LruTokens::new(10);
+    for i in 0..1000 {
+        c.put(i, (), 0);
+    }
+    assert_eq!(c.len(), 1000);
+    assert_eq!(c.weight(), 0);
+}
+
+#[test]
+fn remove_then_reinsert_tracks_weight() {
+    // Weight bookkeeping must stay consistent across remove + reinsert cycles.
+    let mut c: LruTokens<&str, ()> = LruTokens::new(100);
+    c.put("a", (), 30);
+    c.put("b", (), 30);
+    assert_eq!(c.weight(), 60);
+    assert!(c.remove(&"a").is_some());
+    assert_eq!(c.weight(), 30);
+    c.put("a", (), 10);
+    assert_eq!(c.weight(), 40);
+    assert_eq!(c.len(), 2);
+}
